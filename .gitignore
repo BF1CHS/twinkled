@@ -131,3 +131,6 @@ dist
 
 # VSCode configs
 .vscode/*
+
+# Dotenv environment variables file
+.env.debug
