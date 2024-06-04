@@ -1,0 +1,31 @@
+name: Twinkled
+
+on:
+  # Runs automatically every day at 00:00 UTC
+  schedule: [{ cron: "0 0 * * *" }]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  twinkle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repo
+        uses: actions/checkout@v2
+      - name: Set up Node
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: "Install dependencies"
+        run: npm install
+      - name: "Build twinkled"
+        run: npm run build
+      - name: "Run twinkled"
+        run: npm start
+        env:
+            PERSONA_ID: ${{ secrets.PERSONA_ID }}
+            GH_TOKEN: ${{ secrets.GH_TOKEN }}
+            GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+            PARATRANZ_TOKEN: ${{ secrets.PARATRANZ_TOKEN }}
