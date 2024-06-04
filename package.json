@@ -15,9 +15,8 @@
         "@babel/parser": "^7.24.4",
         "@babel/preset-env": "^7.24.3",
         "@babel/traverse": "^7.24.1",
-        "@octokit/core": "^6.1.2",
+        "axios": "^1.7.2",
         "dotenv": "^16.4.5",
-        "prettier": "3.2.5",
         "tslog": "^4.9.2"
     },
     "devDependencies": {
