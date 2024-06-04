@@ -21,7 +21,7 @@ function (e, t, n) {
     var matchPattern = function (inputString) {
         inputString += end_marker;
         var matchedPattern = null;
-            
+
         for (var pattern in t.bf1chsDynamicTransExt) {
             var replacePattern = t.bf1chsDynamicTransExt[pattern];
             var patternWithMarker = RegExp.escape(pattern) + end_marker;
@@ -61,7 +61,7 @@ function (e, t, n) {
         } else if (pattern = matchPattern(text)) {
             return pattern;
         } else {
-            BF1CHS.debugStorage.untranslatedTexts.add(text);
+            // BF1CHS.debugStorage.untranslatedTexts.add(text);
             return text;
         }
     };

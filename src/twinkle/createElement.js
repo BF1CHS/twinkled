@@ -4,9 +4,9 @@ try {
     } else if (e === "imgui" && t && t.label) {
         t.label = bf1chs_translator.bf1chsReplaceDynamicTrans(t.label);
     }
-} catch(e) {
-    BF1CHS.debugStorage.transErrors.push({
-        message: e.toString(),
-        stack: e.stack
-    });
+} catch (e) {
+    // BF1CHS.debugStorage.transErrors.push({
+    //     message: e.toString(),
+    //     stack: e.stack
+    // });
 }
