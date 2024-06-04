@@ -60,28 +60,44 @@ class Twinkled {
         const bundleManifest = await this.fetchBundleManifest();
 
         log.info("Fetching latest release version from GitHub...");
-        const githubVersion = await this.githubApi.fetchLatestReleaseVer();
+        const rawGithubVersion = await this.githubApi.fetchLatestReleaseVer();
 
         log.info("Fetching latest release version from Gitee...");
-        const giteeVersion = await this.giteeApi.fetchLatestReleaseVer();
+        const rawGiteeVersion = await this.giteeApi.fetchLatestReleaseVer();
 
-        if (githubVersion !== giteeVersion) {
+        if (rawGithubVersion !== rawGiteeVersion) {
             log.error(
                 "GitHub and Gitee versions do not match. Please check the release versions."
             );
+            log.error(`GitHub version: ${rawGithubVersion}`);
+            log.error(`Gitee version: ${rawGiteeVersion}`);
             return;
         }
 
-        // if (bundleManifest.bundleVersion === githubVersion) {
-        //     log.info("Bundle is up to date.");
-        //     return;
-        // }
-        log.info("Bundle is outdated.");
-        log.info(`Github/Gitee version: ${githubVersion}`);
+        log.info(`Github/Gitee version: ${rawGithubVersion}`);
         log.info(`Remote version: ${bundleManifest.bundleVersion}`);
+
+        const [releaseVersion, releaseMinorVersion] =
+            rawGithubVersion.split(".");
+
+        if (
+            bundleManifest.bundleVersion === releaseVersion &&
+            !this.config.manualMode
+        ) {
+            log.info("Bundle is up to date.");
+            log.info("Not in manual mode, exiting.");
+            return;
+        }
+
+        if (bundleManifest.bundleVersion !== releaseVersion) {
+            log.info("Bundle is outdated.");
+        } else {
+            log.info("Bundle is up to date, but in manual mode, continuing...");
+        }
+
         log.info("Updating...");
 
-        // Hook the translator function into the codse
+        // Hook the translator function into the code
         const bundle = await this.fetchBundleCode(bundleManifest);
         const hooker = new JSHooker(bundle.jsCode);
         hooker.hook();
@@ -93,25 +109,28 @@ class Twinkled {
         log.info("Bundle saved.");
 
         // Create a new release
-        // try {
-        //     log.info("Creating release for GitHub...");
-        //     await this.githubApi.createRelease(bundle.version, fileName);
+        const newVersion = `${bundle.version}.${
+            releaseMinorVersion ? Number.parseInt(releaseMinorVersion) + 1 : 0
+        }`;
+        try {
+            log.info("Creating release for GitHub...");
+            await this.githubApi.createRelease(newVersion, fileName);
 
-        //     log.info("Creating release for Gitee...");
-        //     await this.giteeApi.createRelease(bundle.version, fileName);
+            log.info("Creating release for Gitee...");
+            await this.giteeApi.createRelease(newVersion, fileName);
 
-        //     log.info("Release created.");
-        // } catch (error) {
-        //     log.error("Failed to create release:", error);
-        // }
+            log.info("Release created.");
+        } catch (error) {
+            log.error("Failed to create release: ", error);
+        }
 
         // Reply to Paratranz thread
         try {
             log.info("Replying to Paratranz thread...");
-            await this.paraTranzApi.reply(bundle.version);
+            await this.paraTranzApi.reply(newVersion);
             log.info("Replied to Paratranz thread.");
         } catch (error) {
-            log.error("Failed to reply to Paratranz thread:", error);
+            log.error("Failed to reply to Paratranz thread: ", error);
         }
     }
 }
