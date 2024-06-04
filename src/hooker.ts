@@ -62,7 +62,7 @@ export class JSHooker {
     }
 
     /**
-     * Generate code from the AST and format it using Prettier.
+     * Generate code from the AST and format it.
      * @returns Generated code.
      */
     public generateCode(): string {
@@ -90,14 +90,6 @@ export class JSHooker {
     }
 
     /**
-     * Hook the debug-related codes into JS code.
-     */
-    public hookDebug(): void {
-        log.info("Hooking debug-related codes...");
-        this.hookBF1CHSDeclaration();
-    }
-
-    /**
      * Hook the translator function into the module functions array.
      *
      * @returns Index of the translator function in the array.
@@ -113,6 +105,25 @@ export class JSHooker {
             },
         }).load() as BabelTypes.FunctionExpression;
         this.arrayExpression.elements.push(translatorFunction);
+        return this.arrayExpression.elements.length - 1;
+    }
+
+    /**
+     * Hook the about page into the module functions array.
+     *
+     * @returns Index of the about page in the array.
+     */
+    private hookAbout(): number {
+        log.info("Hooking about page...");
+        const aboutPage = new JSLoader({
+            path: "src/twinkle/about.js",
+            mode: "expression",
+            props: {
+                ABOUT_TXT_FILE: "BF1CHS_about.txt",
+                ABOUT_LOGO_FILE: "BF1CHS_logo.png",
+            },
+        }).load() as BabelTypes.FunctionExpression;
+        this.arrayExpression.elements.push(aboutPage);
         return this.arrayExpression.elements.length - 1;
     }
 
@@ -151,6 +162,75 @@ export class JSHooker {
                 statement.id!.name === "R"
         ) as BabelTypes.FunctionDeclaration;
         reactCreateElement.body.body.unshift(...translatorStatements);
+    }
+
+    /**
+     * Hook the BF1CHS about page into the JS code.
+     */
+    private hookView(moduleIndex: number, aboutIndex: number): void {
+        log.info("Hooking about page into menu...");
+
+        const viewModule = this.getModule(moduleIndex);
+        const viewModuleInside = (
+            (
+                (
+                    (
+                        (viewModule.body as BabelTypes.BlockStatement)
+                            .body[0] as BabelTypes.ExpressionStatement
+                    ).expression as BabelTypes.CallExpression
+                ).callee as BabelTypes.MemberExpression
+            ).object as BabelTypes.FunctionExpression
+        ).body as BabelTypes.BlockStatement;
+
+        const viewDeclaration = new JSLoader({
+            path: "src/twinkle/view.d.js",
+            mode: "statement",
+            props: {
+                ABOUT_INDEX: aboutIndex,
+            },
+        }).load() as BabelTypes.Statement[];
+        const viewStatements = new JSLoader({
+            path: "src/twinkle/view.js",
+            mode: "statement",
+        }).load() as BabelTypes.Statement[];
+
+        // Add declaration after the second statement
+        viewModuleInside.body.splice(1, 0, ...viewDeclaration);
+
+        // Hook the about statements
+        const naviInner = (
+            (
+                (
+                    (
+                        (
+                            viewModuleInside
+                                .body[8] as BabelTypes.ExpressionStatement
+                        ).expression as BabelTypes.SequenceExpression
+                    ).expressions[1] as BabelTypes.AssignmentExpression
+                ).right as BabelTypes.FunctionExpression
+            ).body as BabelTypes.BlockStatement
+        ).body;
+        naviInner.splice(7, 0, ...viewStatements);
+
+        const tabs = (
+            (
+                (
+                    (
+                        (
+                            (
+                                (
+                                    (
+                                        naviInner[8] as BabelTypes.ExpressionStatement
+                                    )
+                                        .expression as BabelTypes.SequenceExpression
+                                ).expressions[1] as BabelTypes.CallExpression
+                            ).arguments[0] as BabelTypes.NewExpression
+                        ).arguments[1] as BabelTypes.ObjectExpression
+                    ).properties[18] as BabelTypes.ObjectProperty
+                ).value as BabelTypes.ConditionalExpression
+            ).alternate as BabelTypes.ArrayExpression
+        ).elements;
+        tabs.push(BabelTypes.identifier("bf1chs_section"));
     }
 
     /**
@@ -271,12 +351,126 @@ export class JSHooker {
     }
 
     /**
+     * Hook the scrollbar into the JS code.
+     */
+    private hookScrollbar(moduleIndex: number) {
+        log.info("Hooking scrollbar...");
+        const scrollbarModule = this.getModule(moduleIndex);
+        const scrollbarModuleInside =
+            scrollbarModule.body as BabelTypes.BlockStatement;
+        const scrollbarExpr = scrollbarModuleInside
+            .body[0] as BabelTypes.ExpressionStatement;
+        const scrollbarInner = (
+            (
+                (scrollbarExpr.expression as BabelTypes.CallExpression)
+                    .callee as BabelTypes.MemberExpression
+            ).object as BabelTypes.FunctionExpression
+        ).body as BabelTypes.BlockStatement;
+        const scrollbarDeclaration = scrollbarInner
+            .body[5] as BabelTypes.VariableDeclaration;
+        const scrollbarStyle = scrollbarDeclaration.declarations[1]
+            .init as BabelTypes.CallExpression;
+        const scrollbarStyleArgs = scrollbarStyle
+            .arguments[0] as BabelTypes.ObjectExpression;
+        const scrollbarContainerStyle = scrollbarStyleArgs
+            .properties[0] as BabelTypes.ObjectProperty;
+        const scrollbarContainerWidthProp = (
+            scrollbarContainerStyle.value as BabelTypes.ObjectExpression
+        ).properties[3] as BabelTypes.ObjectProperty;
+        const scrollbarContainerWidth =
+            scrollbarContainerWidthProp.value as BabelTypes.NumericLiteral;
+        scrollbarContainerWidth.value = 6;
+    }
+
+    private hookExternFiles({
+        externalFilesModuleIndex,
+        ppContentModuleIndex,
+    }: {
+        externalFilesModuleIndex: number;
+        ppContentModuleIndex: number;
+    }) {
+        log.info("Hooking external files...");
+
+        const getDeclaration = (moduleIndex: number) => {
+            const module = this.getModule(moduleIndex);
+            const moduleInside = module.body as BabelTypes.BlockStatement;
+            const moduleExpr = moduleInside
+                .body[0] as BabelTypes.ExpressionStatement;
+            const moduleExprInner = (
+                (
+                    (
+                        (moduleExpr.expression as BabelTypes.CallExpression)
+                            .callee as BabelTypes.MemberExpression
+                    ).object as BabelTypes.FunctionExpression
+                ).body as BabelTypes.BlockStatement
+            ).body as BabelTypes.Statement[];
+            return moduleExprInner[1] as BabelTypes.VariableDeclaration;
+        };
+
+        const externalFilesDeclaration = getDeclaration(
+            externalFilesModuleIndex
+        );
+        const eulaTOSPP = externalFilesDeclaration.declarations[11]
+            .init as BabelTypes.ObjectExpression;
+        const eulaTOSPPonPC = (
+            eulaTOSPP.properties[2] as BabelTypes.ObjectProperty
+        ).value as BabelTypes.ObjectExpression;
+
+        const setValue = (obj: BabelTypes.ObjectExpression) => {
+            const zhTWobj = (
+                obj.properties[
+                    obj.properties.length - 1
+                ] as BabelTypes.ObjectProperty
+            ).value as BabelTypes.CallExpression;
+            const zhTWStr = zhTWobj.arguments[0] as BabelTypes.StringLiteral;
+            switch (zhTWStr.value) {
+                case "/sparta/assets/legal/EULA_Battlefield1_PC_8.16.16_CHT_CN-23d94b14.txt":
+                    zhTWStr.value =
+                        "/sparta/jsclient/builds/assets/translations/BF1CHS-EULA_Battlefield1_PC_8.16.16.txt";
+                    break;
+                case "/sparta/assets/legal/BF1-EA-Terms_of_service-PC-tc-267334b9.txt":
+                    zhTWStr.value =
+                        "/sparta/jsclient/builds/assets/translations/BF1CHS-BF1-EA-Terms_of_service-PC.txt";
+                    break;
+                case "/sparta/assets/legal/BF1-EA-Privacy_Policy-PC-tc-20c38a96.txt":
+                    zhTWStr.value =
+                        "/sparta/jsclient/builds/assets/translations/BF1CHS-BF1-EA-Privacy_Policy-PC.txt";
+                    break;
+                default:
+                    throw new Error("Unknown file path.");
+            }
+        };
+
+        for (const prop of eulaTOSPPonPC.properties as BabelTypes.ObjectProperty[]) {
+            const obj = (
+                prop.value.type === "ConditionalExpression"
+                    ? prop.value.alternate
+                    : prop.value
+            ) as BabelTypes.ObjectExpression;
+            setValue(obj);
+        }
+
+        const ppContentDeclaration = getDeclaration(ppContentModuleIndex);
+        const ppContentOnPC =
+            ppContentDeclaration.declarations[
+                ppContentDeclaration.declarations.length - 2
+            ];
+        const ppContentOnPCObj =
+            ppContentOnPC.init as BabelTypes.ObjectExpression;
+        setValue(ppContentOnPCObj);
+    }
+
+    /**
      * Hook i18n functions into the JS code.
      */
     public hook(): void {
         log.info("Hooking i18n functions...");
+
         const translatorIndex = this.hookTranslator();
         this.hookReactCreateElement(876, translatorIndex);
+
+        const aboutIndex = this.hookAbout();
+        this.hookView(1249, aboutIndex);
 
         [574, 683].forEach((moduleIndex) => {
             this.hookFontConfig(moduleIndex, "BFTextRegularSCFonts");
@@ -290,6 +484,13 @@ export class JSHooker {
                 name: "M Ying Hei PRC",
                 url: "/sparta/jsclient/builds/assets/BFText-Regular-SC.ttf",
             },
+        });
+
+        this.hookScrollbar(34);
+
+        this.hookExternFiles({
+            externalFilesModuleIndex: 1407,
+            ppContentModuleIndex: 1364,
         });
     }
 }
